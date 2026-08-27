@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-import io
 
 # ---------------------------------------------------------
-# PAGE CONFIGURATION
+# PAGE CONFIG
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Ferry Pulse AI",
@@ -12,9 +11,10 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# TITLE
+# HEADER
 # ---------------------------------------------------------
 st.title("⛴️ Ferry Pulse AI")
+
 st.subheader("Short-Term Ferry Ticket Demand Forecasting")
 
 st.write(
@@ -23,9 +23,9 @@ st.write(
 )
 
 # ---------------------------------------------------------
-# DATASET SECTION
+# DATASET
 # ---------------------------------------------------------
-st.header("Dataset")
+st.header("📂 Dataset")
 
 st.write(
     "Upload your ferry ticket demand CSV dataset below."
@@ -34,81 +34,39 @@ st.write(
 uploaded_file = st.file_uploader(
     "Upload ferry ticket demand dataset",
     type=["csv"],
-    help="Upload a CSV file containing ferry ticket demand data."
+    max_upload_size=200,
+    key="ferry_csv"
 )
 
 # ---------------------------------------------------------
-# PROCESS UPLOADED FILE
+# PROCESS DATASET
 # ---------------------------------------------------------
 if uploaded_file is not None:
 
-    # File size
-    file_size_mb = uploaded_file.size / (1024 * 1024)
-
-    st.write(
-        f"**File:** {uploaded_file.name}  \n"
-        f"**Size:** {file_size_mb:.2f} MB"
-    )
-
-    # -----------------------------------------------------
-    # SAFETY CHECK
-    # -----------------------------------------------------
-    if file_size_mb > 200:
-        st.error(
-            "The uploaded file is larger than 200 MB. "
-            "Please upload a smaller CSV file."
-        )
-        st.stop()
-
-    # -----------------------------------------------------
-    # READ CSV
-    # -----------------------------------------------------
     try:
-        file_bytes = uploaded_file.getvalue()
 
-        try:
-            df = pd.read_csv(
-                io.BytesIO(file_bytes),
-                encoding="utf-8"
-            )
+        with st.spinner("Reading dataset..."):
 
-        except UnicodeDecodeError:
-            df = pd.read_csv(
-                io.BytesIO(file_bytes),
-                encoding="latin1"
-            )
+            df = pd.read_csv(uploaded_file)
 
-        # -------------------------------------------------
-        # SUCCESS MESSAGE
-        # -------------------------------------------------
         st.success("✅ Dataset uploaded successfully!")
 
         # -------------------------------------------------
-        # DATASET PREVIEW
+        # BASIC INFORMATION
         # -------------------------------------------------
-        st.subheader("📊 Dataset Preview")
-
-        st.dataframe(
-            df.head(10),
-            use_container_width=True
-        )
-
-        # -------------------------------------------------
-        # DATASET INFORMATION
-        # -------------------------------------------------
-        st.subheader("📋 Dataset Information")
+        st.header("📊 Dataset Overview")
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
             st.metric(
-                "Number of Rows",
+                "Rows",
                 f"{df.shape[0]:,}"
             )
 
         with col2:
             st.metric(
-                "Number of Columns",
+                "Columns",
                 df.shape[1]
             )
 
@@ -119,16 +77,28 @@ if uploaded_file is not None:
             )
 
         # -------------------------------------------------
-        # COLUMN NAMES
+        # PREVIEW
         # -------------------------------------------------
-        st.subheader("🗂️ Dataset Columns")
+        st.subheader("Dataset Preview")
 
-        st.write(list(df.columns))
+        st.dataframe(
+            df.head(10),
+            use_container_width=True
+        )
+
+        # -------------------------------------------------
+        # COLUMNS
+        # -------------------------------------------------
+        st.subheader("Dataset Columns")
+
+        st.write(
+            list(df.columns)
+        )
 
         # -------------------------------------------------
         # DATA TYPES
         # -------------------------------------------------
-        st.subheader("🔍 Data Types")
+        st.subheader("Data Types")
 
         dtype_df = pd.DataFrame({
             "Column": df.columns,
@@ -142,7 +112,7 @@ if uploaded_file is not None:
         )
 
         # -------------------------------------------------
-        # DATASET STATISTICS
+        # STATISTICS
         # -------------------------------------------------
         st.subheader("📈 Dataset Statistics")
 
@@ -150,7 +120,7 @@ if uploaded_file is not None:
             include="number"
         )
 
-        if not numeric_df.empty:
+        if len(numeric_df.columns) > 0:
 
             st.dataframe(
                 numeric_df.describe().round(2),
@@ -160,27 +130,26 @@ if uploaded_file is not None:
         else:
 
             st.info(
-                "No numerical columns were found for statistical analysis."
+                "No numerical columns were found."
             )
 
         # -------------------------------------------------
-        # MISSING VALUE ANALYSIS
+        # MISSING VALUES
         # -------------------------------------------------
         st.subheader("⚠️ Missing Value Analysis")
 
-        missing_df = pd.DataFrame({
-            "Column": df.columns,
-            "Missing Values": df.isnull().sum().values,
-            "Missing Percentage": (
-                df.isnull().mean().values * 100
-            ).round(2)
-        })
+        missing = df.isnull().sum()
 
-        missing_df = missing_df[
-            missing_df["Missing Values"] > 0
+        missing = missing[
+            missing > 0
         ]
 
-        if not missing_df.empty:
+        if len(missing) > 0:
+
+            missing_df = pd.DataFrame({
+                "Column": missing.index,
+                "Missing Values": missing.values
+            })
 
             st.dataframe(
                 missing_df,
@@ -190,20 +159,20 @@ if uploaded_file is not None:
         else:
 
             st.success(
-                "✅ No missing values found in the dataset."
+                "✅ No missing values found."
             )
 
         # -------------------------------------------------
-        # DUPLICATE ROWS
+        # DUPLICATES
         # -------------------------------------------------
         st.subheader("🔄 Duplicate Records")
 
-        duplicate_count = df.duplicated().sum()
+        duplicates = df.duplicated().sum()
 
-        if duplicate_count > 0:
+        if duplicates > 0:
 
             st.warning(
-                f"Found {duplicate_count:,} duplicate rows."
+                f"{duplicates:,} duplicate rows found."
             )
 
         else:
@@ -212,24 +181,6 @@ if uploaded_file is not None:
                 "✅ No duplicate rows found."
             )
 
-        # -------------------------------------------------
-        # BASIC DATASET SUMMARY
-        # -------------------------------------------------
-        st.subheader("📌 Dataset Summary")
-
-        st.write(
-            f"""
-            - **Rows:** {df.shape[0]:,}
-            - **Columns:** {df.shape[1]}
-            - **Numerical Columns:** {len(numeric_df.columns)}
-            - **Missing Values:** {df.isnull().sum().sum():,}
-            - **Duplicate Rows:** {duplicate_count:,}
-            """
-        )
-
-    # -----------------------------------------------------
-    # ERROR HANDLING
-    # -----------------------------------------------------
     except pd.errors.EmptyDataError:
 
         st.error(
@@ -239,18 +190,18 @@ if uploaded_file is not None:
     except pd.errors.ParserError:
 
         st.error(
-            "❌ Unable to read the CSV file. "
-            "Please check that the file is a valid CSV."
+            "❌ The CSV file could not be parsed. "
+            "Please check that it is a valid CSV file."
         )
 
     except Exception as e:
 
         st.error(
-            f"❌ An error occurred while reading the dataset: {e}"
+            f"❌ Error while reading dataset: {e}"
         )
 
 else:
 
     st.info(
-        "📂 Please upload a CSV dataset to begin."
+        "📁 Please upload a CSV dataset to begin."
     )
